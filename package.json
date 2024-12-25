@@ -8,7 +8,11 @@
     "dev": "nodemon index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": ["car-rental", "backend", "express"],
+  "keywords": [
+    "car-rental",
+    "backend",
+    "express"
+  ],
   "author": "Your Name",
   "license": "ISC",
   "dependencies": {
