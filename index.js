@@ -2,6 +2,8 @@ const express = require('express');
 require("dotenv").config();
 const { MongoClient, ServerApiVersion } = require('mongodb');
 const cors = require('cors');
+const multer = require('multer');  // To handle file uploads
+const path = require('path');
 const app = express();
 
 // Environment variables
@@ -14,6 +16,19 @@ app.use(cors());
 // MongoDB URI
 const uri = `mongodb+srv://${process.env.MONGO_USER}:${process.env.MONGO_PASS}@cluster0.62t6y.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
+// Set up file storage with multer
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, 'uploads/');  // specify upload folder
+  },
+  filename: function (req, file, cb) {
+    cb(null, Date.now() + path.extname(file.originalname));  // create a unique filename
+  },
+});
+
+const upload = multer({ storage: storage });
+
+// MongoDB connection setup
 const client = new MongoClient(uri, {
   serverApi: {
     version: ServerApiVersion.v1,
@@ -32,14 +47,23 @@ async function run() {
     const db = client.db("carvex");
     const carCollection = db.collection("cars");
 
-
-
-    
     // POST route to add car
-    app.post('/add-car', async (req, res) => {
+    app.post('/cars', upload.array('images', 5), async (req, res) => { // max 5 images
       try {
         const carData = req.body;
-        await carCollection.insertOne(carData);
+
+        // Collect image file paths
+        const imagePaths = req.files.map(file => file.path);
+
+        // Add images and bookingCount (default 0) to carData
+        const carWithImages = {
+          ...carData,
+          images: imagePaths,
+          bookingCount: 0,
+        };
+
+        // Insert into MongoDB
+        await carCollection.insertOne(carWithImages);
         res.status(201).json({ message: 'Car added successfully!' });
       } catch (error) {
         console.error(error);
@@ -48,7 +72,7 @@ async function run() {
     });
 
   } finally {
-  
+    // Nothing here for now
   }
 }
 run().catch(console.dir);
@@ -62,5 +86,3 @@ app.get('/', (req, res) => {
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
-
-
