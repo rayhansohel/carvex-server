@@ -14,7 +14,6 @@ app.use(cors());
 // MongoDB URI
 const uri = `mongodb+srv://${process.env.MONGO_USER}:${process.env.MONGO_PASS}@cluster0.62t6y.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
-
 const client = new MongoClient(uri, {
   serverApi: {
     version: ServerApiVersion.v1,
@@ -25,26 +24,43 @@ const client = new MongoClient(uri, {
 
 async function run() {
   try {
-    // Connect the client to the server	(optional starting in v4.7)
     await client.connect();
-    // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
-    console.log("Pinged your deployment. You successfully connected to MongoDB!");
+    console.log("Successfully connected to MongoDB!");
+
+    // MongoDB database and collection
+    const db = client.db("carvex");
+    const carCollection = db.collection("cars");
+
+
+
+    
+    // POST route to add car
+    app.post('/add-car', async (req, res) => {
+      try {
+        const carData = req.body;
+        await carCollection.insertOne(carData);
+        res.status(201).json({ message: 'Car added successfully!' });
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Error adding car' });
+      }
+    });
+
   } finally {
-    // Ensures that the client will close when you finish/error
-    await client.close();
+  
   }
 }
 run().catch(console.dir);
 
-
-
 // Routes
 app.get('/', (req, res) => {
-  res.send('Server is running!');
+  res.send('Carvex Server is running!');
 });
 
 // Start the server
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
+
+
