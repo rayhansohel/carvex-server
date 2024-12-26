@@ -2,7 +2,7 @@ const express = require('express');
 require("dotenv").config();
 const { MongoClient, ServerApiVersion } = require('mongodb');
 const cors = require('cors');
-const multer = require('multer');  // To handle file uploads
+const multer = require('multer');
 const path = require('path');
 const app = express();
 
