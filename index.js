@@ -112,6 +112,18 @@ async function run() {
       }
     });
 
+    // Get cars by User Email
+    app.get("/cars/user/:email", async (req, res) => {
+      const { email } = req.params;
+      try {
+        const cars = await carCollection.find({ email }).toArray();
+        res.status(200).json(cars);
+      } catch (error) {
+        console.error("Failed to fetch user's car:", error);
+        res.status(500).json({ error: "Failed to fetch cars" });
+      }
+    });
+
     // PUT: Update car details
     app.put("/cars/:id", async (req, res) => {
       try {
@@ -187,11 +199,10 @@ async function run() {
   }
 }
 
-
 // Start Server
 (async () => {
   try {
-    await run();  // Correct function name here
+    await run(); // Correct function name here
     app.listen(PORT, () => {
       console.log(`Server is running on port ${PORT}`);
     });
