@@ -1,4 +1,3 @@
-// Required modules
 const express = require("express");
 require("dotenv").config();
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
@@ -50,9 +49,10 @@ async function run() {
     await client.connect();
     console.log("Connected to MongoDB!");
 
-    // MongoDB database and collection
+    // MongoDB database and collections
     const db = client.db("carvex");
     const carCollection = db.collection("cars");
+    const bookingCollection = db.collection("bookings");
 
     // Routes
 
@@ -100,7 +100,6 @@ async function run() {
     app.get("/cars/:id", async (req, res) => {
       const { id } = req.params;
       try {
-        // Corrected to query the carCollection
         const car = await carCollection.findOne({ _id: new ObjectId(id) });
         if (!car) {
           return res.status(404).json({ error: "Car not found" });
@@ -112,88 +111,131 @@ async function run() {
       }
     });
 
-    // Get cars by User Email
-    app.get("/cars/user/:email", async (req, res) => {
-      const { email } = req.params;
+    // POST: Book a car (create booking)
+    app.post("/bookings", async (req, res) => {
       try {
-        const cars = await carCollection.find({ email }).toArray();
-        res.status(200).json(cars);
-      } catch (error) {
-        console.error("Failed to fetch user's car:", error);
-        res.status(500).json({ error: "Failed to fetch cars" });
-      }
-    });
+        const { userEmail, carId, startDate, endDate } = req.body;
 
-    // PUT: Update car details
-    app.put("/cars/:id", async (req, res) => {
-      try {
-        const carId = req.params.id;
-        const updateData = req.body;
-
+        // Validate carId and dates
         if (!ObjectId.isValid(carId)) {
           return res.status(400).json({ message: "Invalid Car ID" });
         }
 
-        const result = await carCollection.updateOne(
-          { _id: new ObjectId(carId) },
-          { $set: updateData }
-        );
-        if (result.modifiedCount === 0)
-          return res
-            .status(404)
-            .json({ message: "Car not found or no changes made" });
-
-        res.status(200).json({ message: "Car updated successfully!" });
-      } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: "Error updating car" });
-      }
-    });
-
-    // DELETE: Remove car by ID
-    app.delete("/cars/:id", async (req, res) => {
-      try {
-        const carId = req.params.id;
-
-        if (!ObjectId.isValid(carId)) {
-          return res.status(400).json({ message: "Invalid Car ID" });
-        }
-
-        const result = await carCollection.deleteOne({
-          _id: new ObjectId(carId),
-        });
-        if (result.deletedCount === 0)
+        const car = await carCollection.findOne({ _id: new ObjectId(carId) });
+        if (!car) {
           return res.status(404).json({ message: "Car not found" });
-
-        res.status(200).json({ message: "Car deleted successfully!" });
-      } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: "Error deleting car" });
-      }
-    });
-
-    // POST: Book a car (increment booking count)
-    app.post("/cars/:id/book", async (req, res) => {
-      try {
-        const carId = req.params.id;
-
-        if (!ObjectId.isValid(carId)) {
-          return res.status(400).json({ message: "Invalid Car ID" });
         }
 
-        const result = await carCollection.updateOne(
+        // Calculate the total price
+        const daysBooked =
+          (new Date(endDate) - new Date(startDate)) / (1000 * 3600 * 24);
+        const totalPrice = car.dailyRentalPrice * daysBooked;
+
+        // Create a booking
+        const booking = {
+          userEmail,
+          carId,
+          carModel: car.carModel,
+          startDate: new Date(startDate),
+          endDate: new Date(endDate),
+          bookingStatus: "Pending", // Status can be Pending, Confirmed, etc.
+          totalPrice,
+        };
+
+        // Store booking in database
+        await bookingCollection.insertOne(booking);
+
+        // Increment booking count for the car
+        await carCollection.updateOne(
           { _id: new ObjectId(carId) },
           { $inc: { bookingCount: 1 } }
         );
-        if (result.modifiedCount === 0)
-          return res.status(404).json({ message: "Car not found" });
 
-        res.status(200).json({ message: "Car booked successfully!" });
+        res.status(201).json({ message: "Car booked successfully!", booking });
       } catch (error) {
         console.error(error);
         res.status(500).json({ message: "Error booking car" });
       }
     });
+
+    // GET: Get all bookings for a user
+    app.get("/bookings/user/:email", async (req, res) => {
+      const { email } = req.params;
+      try {
+        const bookings = await bookingCollection
+          .find({ userEmail: email })
+          .toArray();
+        res.status(200).json(bookings);
+      } catch (error) {
+        console.error("Failed to fetch bookings:", error);
+        res.status(500).json({ message: "Failed to fetch bookings" });
+      }
+    });
+
+    // PUT: Update booking status (e.g., Confirmed or Cancelled)
+    app.put("/bookings/:id", async (req, res) => {
+      const { id } = req.params;
+      const { status } = req.body;
+
+      try {
+        if (!ObjectId.isValid(id)) {
+          return res.status(400).json({ message: "Invalid Booking ID" });
+        }
+
+        const result = await bookingCollection.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: { bookingStatus: status } }
+        );
+
+        if (result.modifiedCount === 0) {
+          return res
+            .status(404)
+            .json({ message: "Booking not found or no changes made" });
+        }
+
+        res.status(200).json({ message: "Booking updated successfully!" });
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Error updating booking" });
+      }
+    });
+
+    // DELETE: Delete a booking
+    // DELETE: Delete a booking by ID
+    app.delete("/bookings/:id", async (req, res) => {
+      const { id } = req.params;
+
+      try {
+        if (!ObjectId.isValid(id)) {
+          return res.status(400).json({ message: "Invalid Booking ID" });
+        }
+
+        const result = await bookingCollection.deleteOne({
+          _id: new ObjectId(id),
+        });
+
+        if (result.deletedCount === 0) {
+          return res.status(404).json({ message: "Booking not found" });
+        }
+
+        // Decrease the booking count for the associated car
+        const booking = await bookingCollection.findOne({
+          _id: new ObjectId(id),
+        });
+        if (booking) {
+          await carCollection.updateOne(
+            { _id: new ObjectId(booking.carId) },
+            { $inc: { bookingCount: -1 } }
+          );
+        }
+
+        res.status(200).json({ message: "Booking deleted successfully" });
+      } catch (error) {
+        console.error("Error deleting booking:", error);
+        res.status(500).json({ message: "Failed to delete booking" });
+      }
+    });
+    
   } catch (error) {
     console.error("Error connecting to MongoDB", error);
   }
