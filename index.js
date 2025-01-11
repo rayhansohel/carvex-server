@@ -1,3 +1,4 @@
+// Required modules
 const express = require("express");
 require("dotenv").config();
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
@@ -49,7 +50,7 @@ async function run() {
     await client.connect();
     console.log("Connected to MongoDB!");
 
-    // MongoDB database and collections
+    // MongoDB database and collection
     const db = client.db("carvex");
     const carCollection = db.collection("cars");
     const bookingCollection = db.collection("bookings");
@@ -100,6 +101,7 @@ async function run() {
     app.get("/cars/:id", async (req, res) => {
       const { id } = req.params;
       try {
+        // Corrected to query the carCollection
         const car = await carCollection.findOne({ _id: new ObjectId(id) });
         if (!car) {
           return res.status(404).json({ error: "Car not found" });
@@ -108,6 +110,66 @@ async function run() {
       } catch (error) {
         console.error("Failed to fetch car details:", error);
         res.status(500).json({ error: "Failed to fetch car details" });
+      }
+    });
+
+    // Get cars by User Email
+    app.get("/cars/user/:email", async (req, res) => {
+      const { email } = req.params;
+      try {
+        const cars = await carCollection.find({ email }).toArray();
+        res.status(200).json(cars);
+      } catch (error) {
+        console.error("Failed to fetch user's car:", error);
+        res.status(500).json({ error: "Failed to fetch cars" });
+      }
+    });
+
+    // PUT: Update car details
+    app.put("/cars/:id", async (req, res) => {
+      try {
+        const carId = req.params.id;
+        const updateData = req.body;
+
+        if (!ObjectId.isValid(carId)) {
+          return res.status(400).json({ message: "Invalid Car ID" });
+        }
+
+        const result = await carCollection.updateOne(
+          { _id: new ObjectId(carId) },
+          { $set: updateData }
+        );
+        if (result.modifiedCount === 0)
+          return res
+            .status(404)
+            .json({ message: "Car not found or no changes made" });
+
+        res.status(200).json({ message: "Car updated successfully!" });
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Error updating car" });
+      }
+    });
+
+    // DELETE: Remove car by ID
+    app.delete("/cars/:id", async (req, res) => {
+      try {
+        const carId = req.params.id;
+
+        if (!ObjectId.isValid(carId)) {
+          return res.status(400).json({ message: "Invalid Car ID" });
+        }
+
+        const result = await carCollection.deleteOne({
+          _id: new ObjectId(carId),
+        });
+        if (result.deletedCount === 0)
+          return res.status(404).json({ message: "Car not found" });
+
+        res.status(200).json({ message: "Car deleted successfully!" });
+      } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Error deleting car" });
       }
     });
 
@@ -138,7 +200,7 @@ async function run() {
           carModel: car.carModel,
           startDate: new Date(startDate),
           endDate: new Date(endDate),
-          bookingStatus: "Pending", // Status can be Pending, Confirmed, etc.
+          bookingStatus: "Pending", 
           totalPrice,
         };
 
@@ -172,7 +234,7 @@ async function run() {
       }
     });
 
-    // PUT: Update booking status (e.g., Confirmed or Cancelled)
+    // PUT: Update booking status
     app.put("/bookings/:id", async (req, res) => {
       const { id } = req.params;
       const { status } = req.body;
@@ -200,7 +262,6 @@ async function run() {
       }
     });
 
-    // DELETE: Delete a booking
     // DELETE: Delete a booking by ID
     app.delete("/bookings/:id", async (req, res) => {
       const { id } = req.params;
@@ -235,7 +296,7 @@ async function run() {
         res.status(500).json({ message: "Failed to delete booking" });
       }
     });
-    
+
   } catch (error) {
     console.error("Error connecting to MongoDB", error);
   }
