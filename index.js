@@ -54,6 +54,7 @@ async function run() {
     const db = client.db("carvex");
     const carCollection = db.collection("cars");
     const bookingCollection = db.collection("bookings");
+    const newsletterCollection = db.collection("newsletterSubscribers");
 
     // Routes
 
@@ -200,7 +201,7 @@ async function run() {
           carModel: car.carModel,
           startDate: new Date(startDate),
           endDate: new Date(endDate),
-          bookingStatus: "Pending", 
+          bookingStatus: "Pending",
           totalPrice,
         };
 
@@ -294,6 +295,33 @@ async function run() {
       } catch (error) {
         console.error("Error deleting booking:", error);
         res.status(500).json({ message: "Failed to delete booking" });
+      }
+    });
+
+    //Subscribe to newsletter
+    app.post("/subscribe", async (req, res) => {
+      try {
+        const { email } = req.body;
+
+        if (!email) {
+          return res.status(400).json({ message: "Email is required" });
+        }
+
+        const existingSubscriber = await newsletterCollection.findOne({
+          email,
+        });
+        if (existingSubscriber) {
+          return res.status(400).json({ message: "Already subscribed" });
+        }
+        await newsletterCollection.insertOne({
+          email,
+          subscribedAt: new Date(),
+        });
+
+        res.status(201).json({ message: "Subscribed successfully!" });
+      } catch (error) {
+        console.error("Error subscribing to newsletter:", error);
+        res.status(500).json({ message: "Internal server error" });
       }
     });
 
